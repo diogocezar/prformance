@@ -1,0 +1,25 @@
+{
+  "name": "prformance",
+  "version": "1.0.0",
+  "description": "POC para medir a performance dos desenvolvedores de uma organização no GitHub",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "analyze": "node index.js",
+    "last-month": "node index.js $(date -v-1m +%Y-%m-01) $(date +%Y-%m-01)",
+    "this-month": "node index.js $(date +%Y-%m-01) $(date +%Y-%m-%d)",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "github",
+    "performance",
+    "metrics",
+    "developers"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "octokit": "^3.1.2"
+  }
+}
