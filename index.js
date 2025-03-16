@@ -16,6 +16,8 @@ const WEIGHTS = {
   pull_requests_reviewed: 3,
   issues_opened: 1,
   issues_closed: 4,
+  pr_comments: 2,
+  branches_created: 1,
 };
 
 // Configuração de concorrência
@@ -94,6 +96,14 @@ async function calculateDeveloperPerformance(startDate, endDate) {
             number: dev.contributions.issues_closed.length,
             items: dev.contributions.issues_closed,
           },
+          pr_comments: {
+            number: dev.contributions.pr_comments.length,
+            items: dev.contributions.pr_comments,
+          },
+          branches_created: {
+            number: dev.contributions.branches_created.length,
+            items: dev.contributions.branches_created,
+          },
         },
       }));
 
@@ -155,25 +165,26 @@ async function processRepository(repoName, startIso, endIso, developers) {
     console.log(`Processando repositório: ${repoName}`);
 
     // Buscar todos os dados em paralelo
-    const [commits, pullRequests, issues] = await Promise.all([
+    const [commits, pullRequests, issues, branches] = await Promise.all([
       getCommits(repoName, startIso, endIso),
       getPullRequests(repoName, startIso, endIso),
       getIssues(repoName, startIso, endIso),
+      getBranches(repoName, startIso, endIso),
     ]);
 
-    // Buscar reviews após ter os PRs
-    const reviews = await getPullRequestReviews(
-      repoName,
-      pullRequests,
-      startIso,
-      endIso
-    );
+    // Buscar reviews e comentários após ter os PRs
+    const [reviews, prComments] = await Promise.all([
+      getPullRequestReviews(repoName, pullRequests, startIso, endIso),
+      getPullRequestComments(repoName, pullRequests, startIso, endIso),
+    ]);
 
     // Processar os dados obtidos
     processCommits(repoName, commits, developers);
     processPullRequests(repoName, pullRequests, developers);
     processReviews(repoName, reviews, developers);
     processIssues(repoName, issues, developers);
+    processPRComments(repoName, prComments, developers);
+    processBranches(repoName, branches, developers);
 
     console.log(`Concluído repositório: ${repoName}`);
   } catch (error) {
@@ -321,6 +332,157 @@ async function getPullRequestReviews(repo, pullRequests, since, until) {
     return reviews;
   } catch (error) {
     console.error(`Erro ao buscar reviews para ${repo}:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca comentários em pull requests de um repositório
+ * @param {string} repo - Nome do repositório
+ * @param {Array} pullRequests - Lista de PRs já obtida
+ * @param {string} since - Data de início
+ * @param {string} until - Data de fim
+ * @returns {Array} - Lista de comentários
+ */
+async function getPullRequestComments(repo, pullRequests, since, until) {
+  try {
+    const comments = [];
+
+    // Processar PRs em lotes para limitar concorrência
+    for (let i = 0; i < pullRequests.length; i += MAX_CONCURRENT_REQUESTS) {
+      const batch = pullRequests.slice(i, i + MAX_CONCURRENT_REQUESTS);
+
+      // Buscar comentários para cada PR em paralelo
+      const batchComments = await Promise.all(
+        batch.map((pr) => getCommentsForPR(repo, pr, since, until))
+      );
+
+      // Adicionar todos os comentários encontrados
+      batchComments.forEach((prComments) => {
+        comments.push(...prComments);
+      });
+    }
+
+    return comments;
+  } catch (error) {
+    console.error(`Erro ao buscar comentários para ${repo}:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca comentários para um PR específico
+ * @param {string} repo - Nome do repositório
+ * @param {Object} pr - Objeto do PR
+ * @param {string} since - Data de início
+ * @param {string} until - Data de fim
+ * @returns {Array} - Lista de comentários para o PR
+ */
+async function getCommentsForPR(repo, pr, since, until) {
+  try {
+    // Buscar comentários regulares do PR
+    const { data: issueComments } = await octokit.rest.issues.listComments({
+      owner: org,
+      repo,
+      issue_number: pr.number,
+      per_page: 100,
+    });
+
+    // Buscar comentários de revisão do PR
+    const { data: reviewComments } =
+      await octokit.rest.pulls.listReviewComments({
+        owner: org,
+        repo,
+        pull_number: pr.number,
+        per_page: 100,
+      });
+
+    // Combinar e filtrar comentários pelo período
+    const allComments = [...issueComments, ...reviewComments]
+      .filter((comment) => {
+        const createdAt = new Date(comment.created_at);
+        return createdAt >= new Date(since) && createdAt <= new Date(until);
+      })
+      .map((comment) => {
+        // Adicionar informações do PR ao comentário
+        comment.pull_request_url = pr.html_url;
+        comment.pull_request_number = pr.number;
+        comment.pull_request_title = pr.title;
+        return comment;
+      });
+
+    return allComments;
+  } catch (error) {
+    console.error(
+      `Erro ao buscar comentários para PR #${pr.number}:`,
+      error.message
+    );
+    return [];
+  }
+}
+
+/**
+ * Busca branches criadas em um repositório no período especificado
+ * @param {string} repo - Nome do repositório
+ * @param {string} since - Data de início
+ * @param {string} until - Data de fim
+ * @returns {Array} - Lista de branches
+ */
+async function getBranches(repo, since, until) {
+  try {
+    // Buscar todas as branches
+    const { data: branches } = await octokit.rest.repos.listBranches({
+      owner: org,
+      repo,
+      per_page: 100,
+    });
+
+    // Para cada branch, precisamos verificar quando foi criada
+    // Infelizmente, a API do GitHub não fornece diretamente a data de criação da branch
+    // Vamos usar o commit mais antigo da branch como aproximação
+    const branchesWithDates = await Promise.all(
+      branches.slice(0, 30).map(async (branch) => {
+        // Limitando a 30 branches para evitar muitas requisições
+        try {
+          // Obter o commit mais antigo da branch (aproximação da data de criação)
+          const { data: commits } = await octokit.rest.repos.listCommits({
+            owner: org,
+            repo,
+            sha: branch.name,
+            per_page: 1,
+            page: 1,
+          });
+
+          if (commits.length > 0) {
+            const createdAt = new Date(commits[0].commit.committer.date);
+
+            // Verificar se a branch foi criada no período especificado
+            if (createdAt >= new Date(since) && createdAt <= new Date(until)) {
+              return {
+                name: branch.name,
+                created_at: commits[0].commit.committer.date,
+                commit_sha: commits[0].sha,
+                commit_url: commits[0].html_url,
+                author: commits[0].author ? commits[0].author.login : null,
+                repository: repo,
+              };
+            }
+          }
+          return null;
+        } catch (error) {
+          console.error(
+            `Erro ao buscar commits para branch ${branch.name}:`,
+            error.message
+          );
+          return null;
+        }
+      })
+    );
+
+    // Filtrar branches nulas (que não foram criadas no período ou deram erro)
+    return branchesWithDates.filter((branch) => branch !== null);
+  } catch (error) {
+    console.error(`Erro ao buscar branches para ${repo}:`, error.message);
     return [];
   }
 }
@@ -507,6 +669,69 @@ function processReviews(repo, reviews, developers) {
 }
 
 /**
+ * Processa os comentários em PRs e atualiza o objeto de desenvolvedores
+ * @param {string} repo - Nome do repositório
+ * @param {Array} comments - Lista de comentários
+ * @param {Object} developers - Objeto de desenvolvedores
+ */
+function processPRComments(repo, comments, developers) {
+  for (const comment of comments) {
+    if (!comment.user || !comment.user.login) continue;
+
+    const username = comment.user.login;
+
+    if (!developers[username]) {
+      initializeDeveloper(developers, username);
+    }
+
+    // Adicionar informações do comentário
+    const commentInfo = {
+      url: comment.html_url,
+      pr_url: comment.pull_request_url,
+      pr_number: comment.pull_request_number,
+      pr_title: comment.pull_request_title,
+      repository: repo,
+      body: comment.body
+        ? comment.body.substring(0, 100) +
+          (comment.body.length > 100 ? "..." : "")
+        : "",
+      created_at: comment.created_at,
+    };
+
+    developers[username].contributions.pr_comments.push(commentInfo);
+  }
+}
+
+/**
+ * Processa as branches criadas e atualiza o objeto de desenvolvedores
+ * @param {string} repo - Nome do repositório
+ * @param {Array} branches - Lista de branches
+ * @param {Object} developers - Objeto de desenvolvedores
+ */
+function processBranches(repo, branches, developers) {
+  for (const branch of branches) {
+    if (!branch.author) continue;
+
+    const username = branch.author;
+
+    if (!developers[username]) {
+      initializeDeveloper(developers, username);
+    }
+
+    // Adicionar informações da branch
+    const branchInfo = {
+      name: branch.name,
+      repository: repo,
+      created_at: branch.created_at,
+      commit_url: branch.commit_url,
+      commit_sha: branch.commit_sha,
+    };
+
+    developers[username].contributions.branches_created.push(branchInfo);
+  }
+}
+
+/**
  * Processa as issues e atualiza o objeto de desenvolvedores
  * @param {string} repo - Nome do repositório
  * @param {Array} issues - Lista de issues
@@ -568,6 +793,8 @@ function initializeDeveloper(developers, username) {
       pull_requests_reviewed: [],
       issues_opened: [],
       issues_closed: [],
+      pr_comments: [],
+      branches_created: [],
     },
   };
 }
@@ -587,7 +814,9 @@ function calculateScores(developers) {
       contributions.pull_requests_reviewed.length *
         WEIGHTS.pull_requests_reviewed +
       contributions.issues_opened.length * WEIGHTS.issues_opened +
-      contributions.issues_closed.length * WEIGHTS.issues_closed;
+      contributions.issues_closed.length * WEIGHTS.issues_closed +
+      contributions.pr_comments.length * WEIGHTS.pr_comments +
+      contributions.branches_created.length * WEIGHTS.branches_created;
   }
 }
 

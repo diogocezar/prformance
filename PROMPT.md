@@ -106,3 +106,15 @@ Por exemplo:
       }
     }
 ```
+
+---
+
+Vamos adicionar mais algumas métricas:
+
+1. Comentários em PRs (+2);
+2. Branches criadas (+1);
+
+---
+
+3. Commits revertidos (-2);
+4. PR mergeada sem solicitações de mudanças (+5)
