@@ -1,0 +1,30 @@
+### Variáveis
+@baseUrl = http://localhost:3000
+@startDate = 2025-03-01
+@endDate = 2025-03-15
+
+### Página inicial
+GET {{baseUrl}}
+Accept: application/json
+
+### Obter performance dos desenvolvedores
+GET {{baseUrl}}/api/developers/performance?startDate={{startDate}}&endDate={{endDate}}
+Accept: application/json
+
+### Obter performance dos desenvolvedores - Mês atual
+# Substitua as datas abaixo pelos valores reais quando for testar
+GET {{baseUrl}}/api/developers/performance?startDate=2024-05-01&endDate=2024-05-31
+Accept: application/json
+
+### Obter performance dos desenvolvedores - Mês anterior
+# Substitua as datas abaixo pelos valores reais quando for testar
+GET {{baseUrl}}/api/developers/performance?startDate=2024-04-01&endDate=2024-04-30
+Accept: application/json
+
+### Obter performance dos desenvolvedores - Erro (sem datas)
+GET {{baseUrl}}/api/developers/performance
+Accept: application/json
+
+### Obter performance dos desenvolvedores - Erro (data inválida)
+GET {{baseUrl}}/api/developers/performance?startDate=invalid&endDate=2024-02-01
+Accept: application/json

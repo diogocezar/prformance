@@ -116,5 +116,12 @@ Vamos adicionar mais algumas métricas:
 
 ---
 
-3. Commits revertidos (-2);
-4. PR mergeada sem solicitações de mudanças (+5)
+
+- Separe as funções que estão em index.js em arquivos;
+- Melhore a organização de código;
+- Crie um servidor em Express para retornar o json, mediante ao envio do range de datas;
+
+---
+
+1. Commits revertidos (-2);
+2. PR mergeada sem solicitações de mudanças (+5)

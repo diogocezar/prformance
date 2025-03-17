@@ -48,20 +48,44 @@ Crie um arquivo `.env` na raiz do projeto com o seguinte conteúdo:
 ```
 GITHUB_TOKEN=seu_token_do_github
 GITHUB_ORG=nome_da_sua_organizacao
+PORT=3000 # Opcional, padrão é 3000
 ```
 
 ## Uso
 
+### Como API REST
+
+Execute o servidor:
+
+```bash
+npm start
+# ou
+npm run server
+```
+
+Para desenvolvimento com reinicialização automática:
+
+```bash
+npm run dev
+```
+
+#### Endpoints disponíveis:
+
+- **GET /** - Página inicial com informações sobre a API
+- **GET /api/developers/performance** - Obtém a performance dos desenvolvedores
+  - Parâmetros de consulta:
+    - `startDate`: Data de início no formato YYYY-MM-DD (obrigatório)
+    - `endDate`: Data de fim no formato YYYY-MM-DD (obrigatório)
+  - Exemplo: `/api/developers/performance?startDate=2024-01-01&endDate=2024-02-01`
+
+### Como CLI
+
 Execute o script passando as datas de início e fim no formato YYYY-MM-DD:
 
 ```bash
-npm start 2024-01-01 2024-02-01
-```
-
-Ou diretamente:
-
-```bash
-node index.js 2024-01-01 2024-02-01
+npm run analyze 2024-01-01 2024-02-01
+# ou diretamente
+node src/index.js 2024-01-01 2024-02-01
 ```
 
 ### Scripts Pré-configurados
@@ -74,9 +98,43 @@ npm run last-month
 
 # Analisar o mês atual (do primeiro dia até hoje)
 npm run this-month
+```
 
-# Analisar um período personalizado
-npm run analyze 2024-01-01 2024-02-01
+## Testes
+
+O projeto inclui arquivos para testar a API usando a extensão REST Client para VS Code:
+
+1. Instale a extensão REST Client no VS Code
+2. Abra os arquivos `.http` na pasta `src/tests`
+3. Clique em "Send Request" acima de cada requisição para executá-la
+
+Para mais detalhes, consulte o [README dos testes](src/tests/README.md).
+
+## Estrutura do Projeto
+
+```
+prformance/
+├── index.js                # Ponto de entrada simplificado
+├── src/
+│   ├── index.js            # Ponto de entrada principal
+│   ├── config.js           # Configurações do aplicativo
+│   ├── server.js           # Configuração do servidor Express
+│   ├── controllers/        # Controladores da API
+│   │   └── developerController.js
+│   ├── routes/             # Rotas da API
+│   │   └── developerRoutes.js
+│   ├── services/           # Serviços de negócio
+│   │   ├── branchService.js
+│   │   ├── commitService.js
+│   │   ├── developerService.js
+│   │   ├── issueService.js
+│   │   ├── pullRequestService.js
+│   │   └── repositoryService.js
+│   ├── tests/              # Testes da API
+│   │   ├── performance.http # Testes HTTP para a API
+│   │   └── http-client.env.json # Configurações de ambiente
+│   └── utils/              # Utilitários
+│       └── githubClient.js
 ```
 
 ## Saída
@@ -207,7 +265,7 @@ O script foi otimizado para lidar com organizações que possuem muitos reposit�
 - Processamento em lotes para reviews de pull requests (5 PRs simultaneamente por padrão)
 - Paginação eficiente para buscar todos os dados da API do GitHub
 
-Você pode ajustar os limites de concorrência modificando as constantes `MAX_CONCURRENT_REPOS` e `MAX_CONCURRENT_REQUESTS` no início do arquivo `index.js`.
+Você pode ajustar os limites de concorrência modificando as constantes no arquivo `src/config.js`.
 
 ## Limitações
 
