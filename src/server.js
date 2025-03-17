@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 const config = require("./config");
 const log = require("./utils/logger");
 const pino = require("pino-http")();
@@ -26,6 +27,10 @@ log.info("Middleware Morgan configurado");
 app.use(pino);
 log.info("Middleware Pino HTTP configurado");
 
+// Configurar pasta de arquivos estáticos
+app.use(express.static(path.join(__dirname, "views")));
+log.info("Pasta de arquivos estáticos configurada");
+
 // Rota raiz
 app.get("/", (req, res) => {
   log.http("Requisição recebida na rota raiz");
@@ -35,8 +40,15 @@ app.get("/", (req, res) => {
     endpoints: {
       developers:
         "/api/developers/performance?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD",
+      visualization: "/visualization",
     },
   });
+});
+
+// Rota para a visualização HTML
+app.get("/visualization", (req, res) => {
+  log.http("Requisição recebida na rota de visualização");
+  res.sendFile(path.join(__dirname, "views", "performance.html"));
 });
 
 // Configurar rotas
@@ -54,6 +66,7 @@ const PORT = config.server.port;
 app.listen(PORT, () => {
   log.success(`Servidor rodando na porta ${PORT}`);
   log.info(`Acesse: http://localhost:${PORT}`);
+  log.info(`Visualização: http://localhost:${PORT}/visualization`);
 });
 
 module.exports = app;

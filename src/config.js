@@ -20,8 +20,8 @@ const config = {
 
   // Configuração de concorrência
   concurrency: {
-    maxConcurrentRepos: 10,
-    maxConcurrentRequests: 5,
+    maxConcurrentRepos: 30,
+    maxConcurrentRequests: 10,
   },
 
   // Configuração do servidor

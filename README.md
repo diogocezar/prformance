@@ -77,6 +77,12 @@ npm run dev
     - `startDate`: Data de início no formato YYYY-MM-DD (obrigatório)
     - `endDate`: Data de fim no formato YYYY-MM-DD (obrigatório)
   - Exemplo: `/api/developers/performance?startDate=2024-01-01&endDate=2024-02-01`
+- **GET /visualization** - Interface web para visualização dos dados de performance
+  - Parâmetros de consulta (opcionais):
+    - `startDate`: Data de início no formato YYYY-MM-DD
+    - `endDate`: Data de fim no formato YYYY-MM-DD
+  - Exemplo: `/visualization?startDate=2024-01-01&endDate=2024-02-01`
+  - Se não forem fornecidos parâmetros, a visualização mostrará os dados do mês atual
 
 ### Como CLI
 
@@ -133,6 +139,8 @@ prformance/
 │   ├── tests/              # Testes da API
 │   │   ├── performance.http # Testes HTTP para a API
 │   │   └── http-client.env.json # Configurações de ambiente
+│   ├── views/              # Arquivos de visualização
+│   │   └── performance.html # Interface web para visualização dos dados
 │   └── utils/              # Utilitários
 │       └── githubClient.js
 ```

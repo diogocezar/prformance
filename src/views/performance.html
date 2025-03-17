@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRFormance - Desempenho dos Desenvolvedores</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+              950: '#1e1b4b',
+            },
+          },
+          animation: {
+            'spin-slow': 'spin 3s linear infinite',
+          }
+        },
+      },
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .max-h-accordion {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+      }
+      .max-h-accordion.open {
+        max-height: 1000px;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-full transition-colors duration-300">
+  <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <header class="mb-8 text-center">
+      <h1 class="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">PRFormance</h1>
+      <div id="date-range" class="text-xl text-gray-600 dark:text-gray-400 mb-6 min-h-6"></div>
+
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+        <form id="date-form" class="flex flex-wrap gap-4 justify-center items-end">
+          <div class="flex flex-col">
+            <label for="startDate" class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data
+              Inicial:</label>
+            <input type="date" id="startDate" name="startDate" required
+              class="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-gray-100">
+          </div>
+          <div class="flex flex-col">
+            <label for="endDate" class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Final:</label>
+            <input type="date" id="endDate" name="endDate" required
+              class="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-gray-100">
+          </div>
+          <div class="flex flex-col gap-2">
+            <button type="submit" id="analyze-btn"
+              class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-70 disabled:cursor-not-allowed">
+              Analisar
+            </button>
+            <button type="button" id="export-btn"
+              class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+              Exportar JSON
+            </button>
+          </div>
+        </form>
+      </div>
+    </header>
+
+    <div class="flex justify-center mb-6">
+      <div class="relative w-full max-w-lg">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <span class="text-gray-500 dark:text-gray-400 text-xl">🔍</span>
+        </div>
+        <input type="text" id="search-input" placeholder="Buscar desenvolvedor..." autocomplete="off"
+          class="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200">
+      </div>
+    </div>
+
+    <div id="content">
+      <div class="flex flex-col items-center justify-center min-h-[300px] text-center">
+        <div
+          class="w-10 h-10 border-4 border-gray-200 dark:border-gray-700 border-t-primary-500 rounded-full animate-spin">
+        </div>
+        <div class="mt-4 text-lg text-gray-600 dark:text-gray-400">Carregando dados de performance...</div>
+      </div>
+    </div>
+  </div>
+
+  <button id="theme-toggle" title="Alternar tema"
+    class="fixed bottom-5 right-5 w-12 h-12 rounded-full bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center shadow-lg z-50 border-none text-2xl transition-colors duration-200">
+    🌓
+  </button>
+
+  <script>
+    // Configuração
+    const API_BASE_URL = window.location.origin;
+
+    // Elementos DOM
+    const contentEl = document.getElementById('content');
+    const dateRangeEl = document.getElementById('date-range');
+
+    // Variáveis globais
+    let performanceData = null;
+    let filteredDevelopers = [];
+
+    // Funções auxiliares
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+
+    function getContributionIcon(type) {
+      const icons = {
+        commits: '📝',
+        pull_requests_opened: '🔀',
+        pull_requests_reviewed: '👀',
+        issues_opened: '🐛',
+        issues_closed: '✅',
+        pr_comments: '💬',
+        branches_created: '🌿'
+      };
+      return icons[type] || '🔍';
+    }
+
+    function getContributionLabel(type) {
+      const labels = {
+        commits: 'Commits',
+        pull_requests_opened: 'PRs Abertos',
+        pull_requests_reviewed: 'PRs Revisados',
+        issues_opened: 'Issues Abertas',
+        issues_closed: 'Issues Fechadas',
+        pr_comments: 'Comentários em PRs',
+        branches_created: 'Branches Criadas'
+      };
+      return labels[type] || type;
+    }
+
+    // Função para buscar os dados da API
+    async function fetchPerformanceData() {
+      try {
+        // Mostrar mensagem de carregamento e limpar a data range
+        dateRangeEl.textContent = "";
+        contentEl.innerHTML = `
+          <div class="flex flex-col items-center justify-center min-h-[300px] text-center">
+            <div class="w-10 h-10 border-4 border-gray-200 dark:border-gray-700 border-t-primary-500 rounded-full animate-spin"></div>
+            <div class="mt-4 text-lg text-gray-600 dark:text-gray-400">Carregando dados de performance...</div>
+          </div>
+        `;
+
+        // Obter parâmetros da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        let startDate = urlParams.get('startDate');
+        let endDate = urlParams.get('endDate');
+
+        // Se não houver datas na URL, usar o mês atual
+        if (!startDate || !endDate) {
+          const today = new Date();
+          const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+          startDate = firstDayOfMonth.toISOString().split('T')[0];
+          endDate = today.toISOString().split('T')[0];
+        }
+
+        // Atualizar a URL com as datas
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('startDate', startDate);
+        newUrl.searchParams.set('endDate', endDate);
+        window.history.pushState({}, '', newUrl);
+
+        // Fazer a requisição para a API
+        const response = await fetch(`${API_BASE_URL}/api/developers/performance?startDate=${startDate}&endDate=${endDate}`);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
+        }
+
+        performanceData = await response.json();
+
+        // Atualizar o intervalo de datas
+        dateRangeEl.textContent = `${formatDate(performanceData.range.start)} - ${formatDate(performanceData.range.end)}`;
+
+        // Renderizar os dados
+        renderDevelopers(performanceData.developers);
+
+      } catch (error) {
+        console.error('Erro ao buscar dados:', error);
+        contentEl.innerHTML = `
+          <div class="bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 p-6 rounded-lg mb-6 text-center shadow">
+            <div class="text-xl font-semibold mb-2">Erro ao carregar os dados</div>
+            <div class="mb-4">${error.message}</div>
+            <div class="text-sm opacity-90">
+              <p>Verifique se a API está em execução e tente novamente.</p>
+              <p>Certifique-se de que as datas selecionadas são válidas.</p>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Função para renderizar os desenvolvedores
+    function renderDevelopers(developers) {
+      if (!developers || developers.length === 0) {
+        contentEl.innerHTML = `
+          <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow text-center">
+            <div class="text-5xl mb-4">📊</div>
+            <div class="text-xl font-medium mb-2">Nenhum dado encontrado para o período selecionado</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">Tente selecionar um período diferente</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Salvar os desenvolvedores filtrados
+      filteredDevelopers = [...developers];
+
+      // Ordenar desenvolvedores por score (decrescente)
+      filteredDevelopers.sort((a, b) => b.score - a.score);
+
+      renderDevelopersList(filteredDevelopers);
+    }
+
+    // Função para renderizar a lista de desenvolvedores
+    function renderDevelopersList(developers) {
+      if (!developers || developers.length === 0) {
+        contentEl.innerHTML = `
+          <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow text-center">
+            <div class="text-5xl mb-4">🔍</div>
+            <div class="text-xl font-medium mb-2">Nenhum desenvolvedor encontrado</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">Tente ajustar os critérios de busca ou o período de análise</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '<div class="grid gap-6 md:grid-cols-1 lg:grid-cols-2">';
+
+      developers.forEach((developer, index) => {
+        html += `
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
+            <div class="flex items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <div class="w-14 h-14 rounded-full mr-4 bg-gray-200 overflow-hidden">
+                <img src="https://github.com/${developer.username}.png" alt="${developer.username}" 
+                  onerror="this.src='https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'"
+                  class="w-full h-full object-cover">
+              </div>
+              <div class="flex-1">
+                <div class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">${developer.username}</div>
+                <div class="text-3xl font-bold text-primary-600">${developer.score.toFixed(1)} pontos</div>
+              </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-3 p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        `;
+
+        // Adicionar badges para cada tipo de contribuição
+        Object.entries(developer.contributions).forEach(([type, data]) => {
+          if (data.number > 0) {
+            html += `
+              <div class="flex items-center bg-white dark:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm">
+                ${getContributionIcon(type)} ${getContributionLabel(type)} <span class="ml-1 font-semibold text-primary-600">${data.number}</span>
+              </div>
+            `;
+          }
+        });
+
+        html += `
+            </div>
+            
+            <div class="contribution-details">
+        `;
+
+        // Adicionar acordeões para cada tipo de contribuição
+        Object.entries(developer.contributions).forEach(([type, data]) => {
+          if (data.number > 0) {
+            html += `
+              <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                <div class="p-4 font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 cursor-pointer flex items-center justify-between select-none" 
+                  aria-expanded="false" onclick="toggleAccordion(this)">
+                  <span>${getContributionIcon(type)} ${getContributionLabel(type)}</span>
+                  <div class="flex items-center">
+                    <span class="bg-primary-400 text-white text-xs px-2 py-1 rounded-full">${data.number}</span>
+                    <span class="ml-2 transition-transform duration-200">▼</span>
+                  </div>
+                </div>
+                <div class="max-h-accordion">
+                  <div class="p-4 bg-gray-50 dark:bg-gray-900">
+            `;
+
+            // Adicionar itens de contribuição
+            data.items.forEach(item => {
+              html += renderContributionItem(type, item);
+            });
+
+            html += `
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+        });
+
+        html += `
+            </div>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+
+      contentEl.innerHTML = html;
+    }
+
+    // Função para renderizar um item de contribuição
+    function renderContributionItem(type, item) {
+      let html = '<div class="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700 last:mb-0 last:pb-0 last:border-b-0">';
+
+      switch (type) {
+        case 'commits':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.url}" target="_blank" class="text-primary-600 hover:underline">${item.message.split('\n')[0]}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div>${formatDate(item.date)}</div>
+            </div>
+          `;
+          break;
+
+        case 'pull_requests_opened':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.url}" target="_blank" class="text-primary-600 hover:underline">${item.title}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div class="mr-4">${item.state === 'merged' ? '🟣 Merged' : item.state === 'closed' ? '🔴 Fechado' : '🟢 Aberto'}</div>
+              <div>${formatDate(item.created_at)}</div>
+            </div>
+          `;
+          break;
+
+        case 'pull_requests_reviewed':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.pr_url}" target="_blank" class="text-primary-600 hover:underline">${item.pr_title}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div class="mr-4">${item.state === 'APPROVED' ? '✅ Aprovado' : item.state === 'CHANGES_REQUESTED' ? '🔄 Mudanças solicitadas' : '💬 Comentado'}</div>
+              <div>${formatDate(item.submitted_at)}</div>
+            </div>
+          `;
+          break;
+
+        case 'issues_opened':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.url}" target="_blank" class="text-primary-600 hover:underline">${item.title}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div class="mr-4">${item.state === 'closed' ? '🔴 Fechada' : '🟢 Aberta'}</div>
+              <div>${formatDate(item.created_at)}</div>
+            </div>
+          `;
+          break;
+
+        case 'issues_closed':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.url}" target="_blank" class="text-primary-600 hover:underline">${item.title}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div>${formatDate(item.closed_at)}</div>
+            </div>
+          `;
+          break;
+
+        case 'pr_comments':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.url}" target="_blank" class="text-primary-600 hover:underline">Comentário em ${item.pr_title}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div>${formatDate(item.created_at)}</div>
+            </div>
+          `;
+          break;
+
+        case 'branches_created':
+          html += `
+            <div class="font-medium mb-1">
+              <a href="${item.commit_url}" target="_blank" class="text-primary-600 hover:underline">${item.name}</a>
+            </div>
+            <div class="flex text-sm text-gray-500 dark:text-gray-400">
+              <div class="font-medium mr-4">${item.repository}</div>
+              <div>${formatDate(item.created_at)}</div>
+            </div>
+          `;
+          break;
+
+        default:
+          html += `
+            <div class="font-medium">
+              Contribuição desconhecida
+            </div>
+          `;
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    // Função para alternar o estado do acordeão
+    function toggleAccordion(header) {
+      const isExpanded = header.getAttribute('aria-expanded') === 'true';
+      header.setAttribute('aria-expanded', !isExpanded);
+
+      // Alternar a rotação do ícone
+      const icon = header.querySelector('.transition-transform');
+      if (isExpanded) {
+        icon.classList.remove('rotate-180');
+      } else {
+        icon.classList.add('rotate-180');
+      }
+
+      const content = header.nextElementSibling;
+      if (isExpanded) {
+        content.classList.remove('open');
+      } else {
+        content.classList.add('open');
+      }
+    }
+
+    // Inicializar a página
+    document.addEventListener('DOMContentLoaded', () => {
+      // Verificar se o tema escuro está salvo e aplicar imediatamente
+      if (localStorage.getItem('darkMode') === 'true') {
+        document.documentElement.classList.add('dark');
+      }
+
+      // Preencher os campos de data com os valores da URL ou valores padrão
+      const urlParams = new URLSearchParams(window.location.search);
+      const startDateParam = urlParams.get('startDate');
+      const endDateParam = urlParams.get('endDate');
+
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+
+      if (startDateParam) {
+        startDateInput.value = startDateParam;
+      } else {
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDateInput.value = firstDayOfMonth.toISOString().split('T')[0];
+      }
+
+      if (endDateParam) {
+        endDateInput.value = endDateParam;
+      } else {
+        const today = new Date();
+        endDateInput.value = today.toISOString().split('T')[0];
+      }
+
+      // Configurar o envio do formulário
+      const dateForm = document.getElementById('date-form');
+      const analyzeBtn = document.getElementById('analyze-btn');
+
+      dateForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        // Mostrar indicador de carregamento no botão
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = `
+          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Analisando...
+        `;
+
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+
+        // Redirecionar para a mesma página com os novos parâmetros
+        window.location.href = `${window.location.pathname}?startDate=${startDate}&endDate=${endDate}`;
+      });
+
+      // Buscar os dados
+      fetchPerformanceData();
+
+      // Configurar o botão de exportação
+      const exportBtn = document.getElementById('export-btn');
+      exportBtn.addEventListener('click', exportJSON);
+
+      // Configurar o botão de alternar tema
+      const themeToggle = document.getElementById('theme-toggle');
+      themeToggle.addEventListener('click', toggleTheme);
+
+      // Configurar a busca
+      const searchInput = document.getElementById('search-input');
+      searchInput.addEventListener('input', filterDevelopers);
+    });
+
+    // Função para exportar os dados em formato JSON
+    function exportJSON() {
+      if (!performanceData) {
+        alert('Nenhum dado disponível para exportar');
+        return;
+      }
+
+      const dataStr = JSON.stringify(performanceData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+      const exportFileDefaultName = `prformance-${performanceData.range.start}-to-${performanceData.range.end}.json`;
+
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    }
+
+    // Expor a função toggleAccordion globalmente
+    window.toggleAccordion = toggleAccordion;
+
+    // Função para alternar entre tema claro e escuro
+    function toggleTheme() {
+      const isDarkMode = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('darkMode', isDarkMode);
+    }
+
+    // Função para filtrar desenvolvedores
+    function filterDevelopers(event) {
+      const searchTerm = event.target.value.toLowerCase().trim();
+
+      if (!performanceData || !performanceData.developers) {
+        return;
+      }
+
+      if (searchTerm === '') {
+        // Se a busca estiver vazia, mostrar todos os desenvolvedores
+        filteredDevelopers = [...performanceData.developers];
+      } else {
+        // Filtrar desenvolvedores pelo nome de usuário
+        filteredDevelopers = performanceData.developers.filter(dev =>
+          dev.username.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      // Ordenar desenvolvedores por score (decrescente)
+      filteredDevelopers.sort((a, b) => b.score - a.score);
+
+      // Renderizar a lista filtrada
+      renderDevelopersList(filteredDevelopers);
+    }
+  </script>
+</body>
+
+</html>
