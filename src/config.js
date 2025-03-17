@@ -20,8 +20,8 @@ const config = {
 
   // Configuração de concorrência
   concurrency: {
-    maxConcurrentRepos: 30,
-    maxConcurrentRequests: 10,
+    maxConcurrentRepos: parseInt(process.env.MAX_CONCURRENT_REPOS || 30),
+    maxConcurrentRequests: parseInt(process.env.MAX_CONCURRENT_REQUESTS || 10),
   },
 
   // Configuração do servidor

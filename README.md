@@ -63,6 +63,10 @@ Além das configurações básicas, você pode personalizar o comportamento do s
 #### Configurações do Servidor
 - `PORT`: Porta em que o servidor será executado (padrão: 3000)
 
+#### Configurações de Concorrência
+- `MAX_CONCURRENT_REPOS`: Número máximo de repositórios processados simultaneamente (padrão: 30)
+- `MAX_CONCURRENT_REQUESTS`: Número máximo de requisições simultâneas por repositório (padrão: 10)
+
 #### Configurações de Cache
 - `CACHE_EXPIRATION_TIME`: Tempo de expiração do cache em milissegundos (padrão: 3600000, ou seja, 1 hora)
 - `ENABLE_CACHE`: Habilitar ou desabilitar o cache para requisições à API do GitHub (padrão: true)
@@ -96,11 +100,16 @@ Este projeto implementa várias estratégias para lidar com esses limites:
 4. **Espera Automática**: Quando os limites são atingidos, o sistema aguarda automaticamente até que sejam resetados.
    - Configure o tempo máximo de espera com `RATE_LIMIT_MAX_WAIT_TIME`
 
+5. **Processamento Paralelo Controlado**: Controla o número de operações paralelas para equilibrar velocidade e limites de taxa.
+   - Configure o número máximo de repositórios processados simultaneamente com `MAX_CONCURRENT_REPOS`
+   - Configure o número máximo de requisições simultâneas por repositório com `MAX_CONCURRENT_REQUESTS`
+
 Se você encontrar o erro "Request quota exhausted for request GET /orgs/{org}/repos", isso significa que você atingiu o limite de requisições. Algumas soluções:
 
 - Verifique se você configurou corretamente o token do GitHub no arquivo `.env`
 - Aumente os valores de cache para reduzir o número de requisições
 - Reduza o escopo da análise (menos repositórios ou período menor)
+- Reduza os valores de `MAX_CONCURRENT_REPOS` e `MAX_CONCURRENT_REQUESTS` para diminuir o número de requisições simultâneas
 - Aguarde até que o limite seja resetado (geralmente 1 hora)
 
 ## Uso
