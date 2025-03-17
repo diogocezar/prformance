@@ -1,5 +1,6 @@
 const developerService = require("../services/developerService");
 const log = require("../utils/logger");
+const cacheManager = require("../utils/cacheManager");
 
 /**
  * Obtém a performance dos desenvolvedores no período especificado
@@ -40,11 +41,15 @@ async function getDeveloperPerformance(req, res, next) {
       `Calculando performance para o período: ${startDate} a ${endDate}`
     );
 
-    // Calcular a performance dos desenvolvedores
-    const result = await developerService.calculateDeveloperPerformance(
-      startDate,
-      endDate
-    );
+    // Usar o gerenciador de cache para a requisição de performance
+    const cacheKey = `performance_${startDate}_${endDate}`;
+    const result = await cacheManager.withCache(cacheKey, async () => {
+      // Calcular a performance dos desenvolvedores
+      return await developerService.calculateDeveloperPerformance(
+        startDate,
+        endDate
+      );
+    });
 
     log.success(
       `Performance calculada com sucesso: ${result.developers.length} desenvolvedores`

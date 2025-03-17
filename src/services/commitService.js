@@ -1,6 +1,8 @@
 const octokit = require("../utils/githubClient");
 const config = require("../config");
 const log = require("../utils/logger");
+const rateLimitHandler = require("../utils/rateLimitHandler");
+const cacheManager = require("../utils/cacheManager");
 
 const org = config.github.organization;
 
@@ -13,33 +15,41 @@ const org = config.github.organization;
  */
 async function getCommits(repo, since, until) {
   try {
-    log.github(`Buscando commits para ${repo} no período especificado`);
-    const commits = [];
-    let page = 1;
-    let hasNextPage = true;
+    // Usar o gerenciador de cache
+    const cacheKey = `commits_${repo}_${since}_${until}`;
+    return await cacheManager.withCache(cacheKey, async () => {
+      log.github(`Buscando commits para ${repo} no período especificado`);
+      const commits = [];
+      let page = 1;
+      let hasNextPage = true;
 
-    while (hasNextPage) {
-      log.debug(`Buscando página ${page} de commits para ${repo}`);
-      const { data } = await octokit.rest.repos.listCommits({
-        owner: org,
-        repo,
-        since,
-        until,
-        per_page: 100,
-        page,
-      });
+      while (hasNextPage) {
+        log.debug(`Buscando página ${page} de commits para ${repo}`);
+        const { data } = await octokit.rest.repos.listCommits({
+          owner: org,
+          repo,
+          since,
+          until,
+          per_page: 100,
+          page,
+        });
 
-      commits.push(...data);
-      hasNextPage = data.length === 100;
-      page++;
+        commits.push(...data);
+        hasNextPage = data.length === 100;
+        page++;
 
-      log.debug(
-        `Encontrados ${data.length} commits na página ${page - 1} para ${repo}`
+        log.debug(
+          `Encontrados ${data.length} commits na página ${
+            page - 1
+          } para ${repo}`
+        );
+      }
+
+      log.success(
+        `Total de ${commits.length} commits encontrados para ${repo}`
       );
-    }
-
-    log.success(`Total de ${commits.length} commits encontrados para ${repo}`);
-    return commits;
+      return commits;
+    });
   } catch (error) {
     log.error(`Erro ao buscar commits para ${repo}`, {
       error: error.message,
