@@ -29,6 +29,13 @@ const config = {
     port: process.env.PORT || 3000,
   },
 
+  // Configuração do Discord
+  discord: {
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+    username: process.env.DISCORD_BOT_USERNAME || "PR Performance Bot",
+    avatarUrl: process.env.DISCORD_BOT_AVATAR_URL || "",
+  },
+
   // Configuração de cache e limites de taxa
   cache: {
     // Tempo de expiração do cache em milissegundos (1 hora por padrão)
@@ -65,6 +72,7 @@ try {
     cacheExpirationTime: `${config.cache.expirationTime / 1000} segundos`,
     rateLimitCheckInterval: `${config.rateLimit.checkInterval / 1000} segundos`,
     rateLimitMaxWaitTime: `${config.rateLimit.maxWaitTime / 1000} segundos`,
+    discordWebhookConfigured: !!config.discord.webhookUrl,
   });
 } catch (error) {
   console.log("⚙️ Configurações carregadas (logger não disponível)");

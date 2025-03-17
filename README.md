@@ -155,6 +155,42 @@ npm run analyze 2024-01-01 2024-02-01
 node src/index.js 2024-01-01 2024-02-01
 ```
 
+### Envio para Discord
+
+Você pode enviar o ranking de performance para um canal do Discord usando webhooks:
+
+1. Configure o webhook do Discord no arquivo `.env`:
+   ```
+   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/seu_webhook_url
+   DISCORD_BOT_USERNAME=PR Performance Bot
+   DISCORD_BOT_AVATAR_URL=https://url-para-avatar-opcional
+   ```
+
+2. Execute um dos comandos a seguir:
+
+   ```bash
+   # Enviar ranking do mês anterior para o Discord
+   npm run send-discord-last-month
+   
+   # Enviar ranking do mês atual para o Discord
+   npm run send-discord-this-month
+   
+   # Enviar ranking de um período específico para o Discord
+   node src/scripts/send-to-discord.js --startDate=2024-01-01 --endDate=2024-02-01
+   
+   # Enviar para um webhook específico (sobrescrevendo a configuração do .env)
+   node src/scripts/send-to-discord.js --startDate=2024-01-01 --endDate=2024-02-01 --webhook=https://discord.com/api/webhooks/outro_webhook
+   ```
+
+O ranking é formatado de forma divertida e enviado ao Discord com:
+- Nome do desenvolvedor e pontuação total
+- Resumo detalhado das contribuições em formato de lista
+- Emojis variados para posições e tipos de contribuição
+- Mensagens divertidas e comemorativas
+- Medalhas para os três primeiros colocados (🥇, 🥈, 🥉)
+
+> **Nota:** Cada execução do script enviará uma nova mensagem para o Discord, independentemente de mensagens anteriores com o mesmo conteúdo.
+
 ### Scripts Pré-configurados
 
 O projeto inclui alguns scripts úteis para análises comuns:
@@ -165,6 +201,12 @@ npm run last-month
 
 # Analisar o mês atual (do primeiro dia até hoje)
 npm run this-month
+
+# Enviar ranking do mês anterior para o Discord
+npm run send-discord-last-month
+
+# Enviar ranking do mês atual para o Discord
+npm run send-discord-this-month
 ```
 
 ## Testes
@@ -190,6 +232,9 @@ prformance/
 │   │   └── developerController.js
 │   ├── routes/             # Rotas da API
 │   │   └── developerRoutes.js
+│   ├── scripts/            # Scripts para uso via CLI
+│   │   ├── analyze-this-month.js
+│   │   └── send-to-discord.js     # Script para enviar rankings para o Discord
 │   ├── services/           # Serviços de negócio
 │   │   ├── branchService.js
 │   │   ├── commitService.js
@@ -198,12 +243,19 @@ prformance/
 │   │   ├── pullRequestService.js
 │   │   └── repositoryService.js
 │   ├── tests/              # Testes da API
-│   │   ├── performance.http # Testes HTTP para a API
-│   │   └── http-client.env.json # Configurações de ambiente
-│   ├── views/              # Arquivos de visualização
-│   │   └── performance.html # Interface web para visualização dos dados
-│   └── utils/              # Utilitários
-│       └── githubClient.js
+│   │   ├── performance.http
+│   │   └── discord.http          # Teste de envio para o Discord
+│   ├── utils/              # Utilitários
+│   │   ├── cacheManager.js       # Gerenciador de cache
+│   │   ├── discordClient.js      # Cliente para envio de mensagens ao Discord
+│   │   ├── discordFormatter.js   # Formatador de mensagens para o Discord
+│   │   ├── githubClient.js       # Cliente de acesso à API do GitHub
+│   │   ├── logger.js             # Utilitário de log
+│   │   └── rateLimitHandler.js   # Gerenciador de limites de taxa
+│   └── views/              # Views para visualização web
+│       └── performance.html
+├── .env                   # Arquivo de variáveis de ambiente
+└── .env.example          # Exemplo de arquivo de variáveis de ambiente
 ```
 
 ## Saída
