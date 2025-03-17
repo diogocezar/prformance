@@ -51,6 +51,58 @@ GITHUB_ORG=nome_da_sua_organizacao
 PORT=3000 # Opcional, padrão é 3000
 ```
 
+Você pode copiar o arquivo `.env.example` e ajustar conforme necessário:
+```bash
+cp .env.example .env
+```
+
+### Configurações Avançadas
+
+Além das configurações básicas, você pode personalizar o comportamento do sistema através das seguintes variáveis de ambiente:
+
+#### Configurações do Servidor
+- `PORT`: Porta em que o servidor será executado (padrão: 3000)
+
+#### Configurações de Cache
+- `CACHE_EXPIRATION_TIME`: Tempo de expiração do cache em milissegundos (padrão: 3600000, ou seja, 1 hora)
+- `ENABLE_CACHE`: Habilitar ou desabilitar o cache para requisições à API do GitHub (padrão: true)
+
+#### Configurações de Limites de Taxa (Rate Limit)
+- `RATE_LIMIT_CHECK_INTERVAL`: Intervalo mínimo entre verificações de limite de taxa em milissegundos (padrão: 60000, ou seja, 1 minuto)
+- `RATE_LIMIT_MAX_WAIT_TIME`: Tempo máximo de espera para reset de limite de taxa em milissegundos (padrão: 300000, ou seja, 5 minutos)
+- `RATE_LIMIT_BATCH_SIZE`: Tamanho do lote para processamento de branches (padrão: 5)
+- `RATE_LIMIT_BATCH_INTERVAL`: Intervalo entre lotes em milissegundos (padrão: 1000, ou seja, 1 segundo)
+
+Estas configurações ajudam a lidar com os limites de taxa da API do GitHub e otimizar o desempenho do sistema.
+
+## Lidando com Limites de Taxa da API do GitHub
+
+A API do GitHub possui limites de taxa (rate limits) que restringem o número de requisições que podem ser feitas em um determinado período. Para usuários não autenticados, o limite é de 60 requisições por hora. Para usuários autenticados com um token pessoal, o limite é de 5.000 requisições por hora.
+
+Este projeto implementa várias estratégias para lidar com esses limites:
+
+1. **Sistema de Cache**: Armazena resultados de requisições para reduzir o número de chamadas à API.
+   - Configure o tempo de expiração do cache com `CACHE_EXPIRATION_TIME`
+   - Habilite ou desabilite o cache com `ENABLE_CACHE`
+
+2. **Verificação de Limites de Taxa**: Verifica proativamente os limites de taxa antes de fazer requisições.
+   - O sistema consulta a API de limites de taxa do GitHub em intervalos configuráveis
+   - Configure o intervalo de verificação com `RATE_LIMIT_CHECK_INTERVAL`
+
+3. **Processamento em Lotes**: Processa dados em lotes menores para evitar atingir os limites rapidamente.
+   - Configure o tamanho do lote com `RATE_LIMIT_BATCH_SIZE`
+   - Configure o intervalo entre lotes com `RATE_LIMIT_BATCH_INTERVAL`
+
+4. **Espera Automática**: Quando os limites são atingidos, o sistema aguarda automaticamente até que sejam resetados.
+   - Configure o tempo máximo de espera com `RATE_LIMIT_MAX_WAIT_TIME`
+
+Se você encontrar o erro "Request quota exhausted for request GET /orgs/{org}/repos", isso significa que você atingiu o limite de requisições. Algumas soluções:
+
+- Verifique se você configurou corretamente o token do GitHub no arquivo `.env`
+- Aumente os valores de cache para reduzir o número de requisições
+- Reduza o escopo da análise (menos repositórios ou período menor)
+- Aguarde até que o limite seja resetado (geralmente 1 hora)
+
 ## Uso
 
 ### Como API REST

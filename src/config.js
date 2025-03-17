@@ -28,6 +28,26 @@ const config = {
   server: {
     port: process.env.PORT || 3000,
   },
+
+  // Configuração de cache e limites de taxa
+  cache: {
+    // Tempo de expiração do cache em milissegundos (1 hora por padrão)
+    expirationTime: parseInt(process.env.CACHE_EXPIRATION_TIME || 3600000),
+    // Habilitar cache para requisições à API do GitHub
+    enabled: process.env.ENABLE_CACHE !== "false",
+  },
+
+  // Configuração de limites de taxa
+  rateLimit: {
+    // Intervalo mínimo entre verificações de limite de taxa (em milissegundos)
+    checkInterval: parseInt(process.env.RATE_LIMIT_CHECK_INTERVAL || 60000),
+    // Tempo máximo de espera para reset de limite de taxa (em milissegundos)
+    maxWaitTime: parseInt(process.env.RATE_LIMIT_MAX_WAIT_TIME || 300000),
+    // Tamanho do lote para processamento de branches
+    batchSize: parseInt(process.env.RATE_LIMIT_BATCH_SIZE || 5),
+    // Intervalo entre lotes (em milissegundos)
+    batchInterval: parseInt(process.env.RATE_LIMIT_BATCH_INTERVAL || 1000),
+  },
 };
 
 // Exportar a configuração antes de usar o logger
@@ -41,6 +61,10 @@ try {
     port: config.server.port,
     maxConcurrentRepos: config.concurrency.maxConcurrentRepos,
     maxConcurrentRequests: config.concurrency.maxConcurrentRequests,
+    cacheEnabled: config.cache.enabled,
+    cacheExpirationTime: `${config.cache.expirationTime / 1000} segundos`,
+    rateLimitCheckInterval: `${config.rateLimit.checkInterval / 1000} segundos`,
+    rateLimitMaxWaitTime: `${config.rateLimit.maxWaitTime / 1000} segundos`,
   });
 } catch (error) {
   console.log("⚙️ Configurações carregadas (logger não disponível)");

@@ -1,8 +1,21 @@
 const octokit = require("../utils/githubClient");
 const config = require("../config");
 const log = require("../utils/logger");
+const rateLimitHandler = require("../utils/rateLimitHandler");
 
 const org = config.github.organization;
+
+// Cache para armazenar resultados e evitar requisições repetidas
+const cache = {
+  repositories: null,
+  branches: {},
+  lastUpdated: {
+    repositories: 0,
+    branches: {},
+  },
+  // Tempo de expiração do cache em milissegundos
+  expirationTime: config.cache.expirationTime,
+};
 
 /**
  * Busca os repositórios da organização
@@ -10,30 +23,77 @@ const org = config.github.organization;
  */
 async function getRepositories() {
   try {
-    log.github(`Buscando repositórios da organização ${org}`);
-    const repos = [];
-    let page = 1;
-    let hasNextPage = true;
-
-    while (hasNextPage) {
-      log.debug(`Buscando página ${page} de repositórios`);
-      const { data } = await octokit.rest.repos.listForOrg({
-        org,
-        per_page: 100,
-        page,
-      });
-
-      repos.push(...data);
-      hasNextPage = data.length === 100;
-      page++;
-
+    // Verificar se há dados em cache válidos
+    const now = Date.now();
+    if (
+      config.cache.enabled &&
+      cache.repositories &&
+      now - cache.lastUpdated.repositories < cache.expirationTime
+    ) {
       log.debug(
-        `Encontrados ${data.length} repositórios na página ${page - 1}`
+        `Usando cache para repositórios (${cache.repositories.length} itens)`
       );
+      return cache.repositories;
+    }
+
+    log.github(`Buscando repositórios da organização ${org}`);
+
+    // Usar o gerenciador de limites de taxa para executar a função
+    const fetchRepos = async () => {
+      const repos = [];
+      let page = 1;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        log.debug(`Buscando página ${page} de repositórios`);
+
+        // Verificar limite de taxa antes de cada requisição
+        const { data } = await octokit.rest.repos.listForOrg({
+          org,
+          per_page: 100,
+          page,
+        });
+
+        repos.push(...data);
+        hasNextPage = data.length === 100;
+        page++;
+
+        log.debug(
+          `Encontrados ${data.length} repositórios na página ${page - 1}`
+        );
+
+        // Se houver mais páginas, verificar o limite de taxa antes de continuar
+        if (hasNextPage) {
+          const hasRemaining = await rateLimitHandler.hasRemainingRequests(
+            "core"
+          );
+          if (!hasRemaining) {
+            const waitTime = await rateLimitHandler.getWaitTime("core");
+            log.warn(
+              `Limite de requisições atingido ao buscar repositórios. Aguardando ${Math.ceil(
+                waitTime / 1000
+              )} segundos.`
+            );
+            await new Promise((resolve) =>
+              setTimeout(resolve, waitTime + 1000)
+            );
+          }
+        }
+      }
+
+      return repos.map((repo) => repo.name);
+    };
+
+    const repos = await rateLimitHandler.executeWithRateLimit(fetchRepos);
+
+    // Armazenar em cache se estiver habilitado
+    if (config.cache.enabled) {
+      cache.repositories = repos;
+      cache.lastUpdated.repositories = now;
     }
 
     log.success(`Total de ${repos.length} repositórios encontrados`);
-    return repos.map((repo) => repo.name);
+    return repos;
   } catch (error) {
     log.error("Erro ao buscar repositórios", {
       error: error.message,
@@ -53,95 +113,159 @@ async function getRepositories() {
  */
 async function getBranches(repo, since, until) {
   try {
-    log.github(`Buscando branches do repositório ${repo}`);
-
-    // Buscar todas as branches
-    const { data: branches } = await octokit.rest.repos.listBranches({
-      owner: org,
-      repo,
-      per_page: 100,
-    });
-
-    log.debug(`Encontradas ${branches.length} branches em ${repo}`);
-
-    // Para cada branch, precisamos verificar quando foi criada
-    // Infelizmente, a API do GitHub não fornece diretamente a data de criação da branch
-    // Vamos usar o commit mais antigo da branch como aproximação
-    const branchLimit = 30; // Limitando a 30 branches para evitar muitas requisições
-    const branchesToProcess = branches.slice(0, branchLimit);
-
-    if (branches.length > branchLimit) {
-      log.warn(
-        `Limitando análise a ${branchLimit} branches de ${branches.length} em ${repo}`
+    // Verificar se há dados em cache válidos
+    const cacheKey = `${repo}_${since}_${until}`;
+    const now = Date.now();
+    if (
+      config.cache.enabled &&
+      cache.branches[cacheKey] &&
+      now - cache.lastUpdated.branches[cacheKey] < cache.expirationTime
+    ) {
+      log.debug(
+        `Usando cache para branches de ${repo} (${cache.branches[cacheKey].length} itens)`
       );
+      return cache.branches[cacheKey];
     }
 
-    const branchesWithDates = await Promise.all(
-      branchesToProcess.map(async (branch) => {
-        try {
-          log.debug(
-            `Verificando data de criação da branch ${branch.name} em ${repo}`
-          );
+    log.github(`Buscando branches do repositório ${repo}`);
 
-          // Obter o commit mais antigo da branch (aproximação da data de criação)
-          const { data: commits } = await octokit.rest.repos.listCommits({
-            owner: org,
-            repo,
-            sha: branch.name,
-            per_page: 1,
-            page: 1,
-          });
+    // Usar o gerenciador de limites de taxa para executar a função
+    const fetchBranches = async () => {
+      // Buscar todas as branches
+      const { data: branches } = await octokit.rest.repos.listBranches({
+        owner: org,
+        repo,
+        per_page: 100,
+      });
 
-          if (commits.length > 0) {
-            const createdAt = new Date(commits[0].commit.committer.date);
-            const sinceDate = new Date(since);
-            const untilDate = new Date(until);
+      log.debug(`Encontradas ${branches.length} branches em ${repo}`);
 
-            // Verificar se a branch foi criada no período especificado
-            if (createdAt >= sinceDate && createdAt <= untilDate) {
+      // Para cada branch, precisamos verificar quando foi criada
+      // Infelizmente, a API do GitHub não fornece diretamente a data de criação da branch
+      // Vamos usar o commit mais antigo da branch como aproximação
+      const branchLimit = 30; // Limitando a 30 branches para evitar muitas requisições
+      const branchesToProcess = branches.slice(0, branchLimit);
+
+      if (branches.length > branchLimit) {
+        log.warn(
+          `Limitando análise a ${branchLimit} branches de ${branches.length} em ${repo}`
+        );
+      }
+
+      // Processar branches em lotes para evitar muitas requisições simultâneas
+      const batchSize = config.rateLimit.batchSize;
+      const batchInterval = config.rateLimit.batchInterval;
+      const branchesWithDates = [];
+
+      for (let i = 0; i < branchesToProcess.length; i += batchSize) {
+        const batch = branchesToProcess.slice(i, i + batchSize);
+
+        // Processar lote de branches
+        const batchResults = await Promise.all(
+          batch.map(async (branch) => {
+            try {
               log.debug(
-                `Branch ${
-                  branch.name
-                } criada no período especificado: ${createdAt.toISOString()}`
+                `Verificando data de criação da branch ${branch.name} em ${repo}`
               );
-              return {
-                name: branch.name,
-                created_at: commits[0].commit.committer.date,
-                commit_sha: commits[0].sha,
-                commit_url: commits[0].html_url,
-                author: commits[0].author ? commits[0].author.login : null,
+
+              // Verificar limite de taxa antes de cada requisição
+              const hasRemaining = await rateLimitHandler.hasRemainingRequests(
+                "core"
+              );
+              if (!hasRemaining) {
+                const waitTime = await rateLimitHandler.getWaitTime("core");
+                log.warn(
+                  `Limite de requisições atingido ao buscar commits. Aguardando ${Math.ceil(
+                    waitTime / 1000
+                  )} segundos.`
+                );
+                await new Promise((resolve) =>
+                  setTimeout(resolve, waitTime + 1000)
+                );
+              }
+
+              // Obter o commit mais antigo da branch (aproximação da data de criação)
+              const { data: commits } = await octokit.rest.repos.listCommits({
+                owner: org,
+                repo,
+                sha: branch.name,
+                per_page: 1,
+                page: 1,
+              });
+
+              if (commits.length > 0) {
+                const createdAt = new Date(commits[0].commit.committer.date);
+                const sinceDate = new Date(since);
+                const untilDate = new Date(until);
+
+                // Verificar se a branch foi criada no período especificado
+                if (createdAt >= sinceDate && createdAt <= untilDate) {
+                  log.debug(
+                    `Branch ${
+                      branch.name
+                    } criada no período especificado: ${createdAt.toISOString()}`
+                  );
+                  return {
+                    name: branch.name,
+                    created_at: commits[0].commit.committer.date,
+                    commit_sha: commits[0].sha,
+                    commit_url: commits[0].html_url,
+                    author: commits[0].author ? commits[0].author.login : null,
+                    repository: repo,
+                  };
+                } else {
+                  log.debug(
+                    `Branch ${
+                      branch.name
+                    } fora do período: ${createdAt.toISOString()}`
+                  );
+                }
+              } else {
+                log.debug(
+                  `Nenhum commit encontrado para branch ${branch.name}`
+                );
+              }
+              return null;
+            } catch (error) {
+              log.error(`Erro ao buscar commits para branch ${branch.name}`, {
+                error: error.message,
                 repository: repo,
-              };
-            } else {
-              log.debug(
-                `Branch ${
-                  branch.name
-                } fora do período: ${createdAt.toISOString()}`
-              );
+              });
+              return null;
             }
-          } else {
-            log.debug(`Nenhum commit encontrado para branch ${branch.name}`);
-          }
-          return null;
-        } catch (error) {
-          log.error(`Erro ao buscar commits para branch ${branch.name}`, {
-            error: error.message,
-            repository: repo,
-          });
-          return null;
+          })
+        );
+
+        // Adicionar resultados do lote
+        branchesWithDates.push(...batchResults);
+
+        // Aguardar um pouco entre lotes para evitar sobrecarga
+        if (i + batchSize < branchesToProcess.length) {
+          await new Promise((resolve) => setTimeout(resolve, batchInterval));
         }
-      })
-    );
+      }
 
-    // Filtrar branches nulas (que não foram criadas no período ou deram erro)
-    const filteredBranches = branchesWithDates.filter(
-      (branch) => branch !== null
-    );
-    log.success(
-      `Encontradas ${filteredBranches.length} branches criadas no período em ${repo}`
-    );
+      // Filtrar branches nulas (que não foram criadas no período ou deram erro)
+      const filteredBranches = branchesWithDates.filter(
+        (branch) => branch !== null
+      );
 
-    return filteredBranches;
+      log.success(
+        `Encontradas ${filteredBranches.length} branches criadas no período em ${repo}`
+      );
+
+      return filteredBranches;
+    };
+
+    const branches = await rateLimitHandler.executeWithRateLimit(fetchBranches);
+
+    // Armazenar em cache se estiver habilitado
+    if (config.cache.enabled) {
+      cache.branches[cacheKey] = branches;
+      cache.lastUpdated.branches[cacheKey] = now;
+    }
+
+    return branches;
   } catch (error) {
     log.error(`Erro ao buscar branches para ${repo}`, {
       error: error.message,
