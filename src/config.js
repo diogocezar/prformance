@@ -9,12 +9,12 @@ const config = {
 
   // Pesos para cálculo do score
   weights: {
-    commits: 2,
+    commits: 3,
     pull_requests_opened: 5,
-    pull_requests_reviewed: 3,
+    pull_requests_reviewed: 4,
     issues_opened: 1,
-    issues_closed: 4,
-    pr_comments: 2,
+    issues_closed: 6,
+    pr_comments: 3,
     branches_created: 1,
   },
 
@@ -32,7 +32,7 @@ const config = {
   // Configuração do Discord
   discord: {
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
-    username: process.env.DISCORD_BOT_USERNAME || "PR Performance Bot",
+    username: process.env.DISCORD_BOT_USERNAME || "PR Performance",
     avatarUrl: process.env.DISCORD_BOT_AVATAR_URL || "",
   },
 
