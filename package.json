@@ -10,9 +10,10 @@
     "analyze": "node src/index.js",
     "last-month": "node src/index.js $(date -v-1m +%Y-%m-01) $(date +%Y-%m-01)",
     "this-month": "node src/index.js $(date +%Y-%m-01) $(date +%Y-%m-%d)",
-    "last-week": "node src/scripts/analyze-last-week.js",
+    "last-week": "node src/index.js $(date -v-7d +%Y-%m-%d) $(date +%Y-%m-%d)",
     "send-discord-last-month": "node src/scripts/send-to-discord.js --startDate=$(date -v-1m +%Y-%m-01) --endDate=$(date +%Y-%m-01)",
     "send-discord-this-month": "node src/scripts/send-to-discord.js --startDate=$(date +%Y-%m-01) --endDate=$(date +%Y-%m-%d)",
+    "send-discord-last-week": "node src/scripts/send-to-discord.js --startDate=$(date -v-7d +%Y-%m-%d) --endDate=$(date +%Y-%m-%d)",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

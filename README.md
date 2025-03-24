@@ -210,6 +210,9 @@ npm run send-discord-last-month
 
 # Enviar ranking do mês atual para o Discord
 npm run send-discord-this-month
+
+# Enviar ranking da última semana para o Discord
+npm run send-discord-last-week
 ```
 
 ## Testes
