@@ -202,6 +202,9 @@ npm run last-month
 # Analisar o mês atual (do primeiro dia até hoje)
 npm run this-month
 
+# Analisar a última semana (últimos 7 dias)
+npm run last-week
+
 # Enviar ranking do mês anterior para o Discord
 npm run send-discord-last-month
 
