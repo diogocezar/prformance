@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-performance
+    restart: always
+    volumes:
+      - ./.cache:/app/.cache
+      - ./logs:/app/logs
+      - cron-logs:/var/log/cron
+    environment:
+      # Configurações GitHub
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_ORG=${GITHUB_ORG}
+      - EXCLUDED_REPOS=${EXCLUDED_REPOS}
+      - MAX_CONCURRENT_REPOS=30
+      - MAX_CONCURRENT_REQUESTS=10
+      
+      # Configurações de cache
+      - ENABLE_CACHE=true
+      - CACHE_EXPIRATION_TIME=86400
+      
+      # Configurações do Discord
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - DISCORD_BOT_USERNAME=PR Performance Bot
+      - DISCORD_BOT_AVATAR_URL=${DISCORD_BOT_AVATAR_URL}
+      
+      # Configurações de rate limit
+      - RATE_LIMIT_CHECK_INTERVAL=10000
+      - MAX_WAIT_TIME=3600000
+
+volumes:
+  cron-logs:
+    driver: local 

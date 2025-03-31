@@ -401,6 +401,93 @@ Você pode ajustar os limites de concorrência modificando as constantes no arqu
 - O token de acesso ao GitHub deve ter permissões suficientes para acessar os dados necessários.
 - A detecção de branches criadas é uma aproximação, pois a API do GitHub não fornece diretamente a data de criação da branch.
 
-## Licença
+---
 
-ISC 
+# Agendador Automático para PR Performance Tracker
+
+Este projeto configura um container Docker com cron para enviar automaticamente o ranking de performance da última semana para o Discord **todas as segundas-feiras às 09:00**.
+
+## Configuração e Uso
+
+### Pré-requisitos
+- Docker e Docker Compose instalados
+- Token do GitHub com permissões para a organização
+- URL do webhook do Discord configurada
+
+### Passos para Iniciar
+
+1. **Copie o arquivo .env.example para .env e configure suas credenciais:**
+   ```bash
+   cp .env.example .env
+   # Edite o arquivo .env com seu editor preferido
+   ```
+
+2. **Inicie o serviço de agendamento:**
+   ```bash
+   docker-compose -f docker-compose.yml up -d
+   ```
+
+3. **Verifique se o serviço está rodando:**
+   ```bash
+   docker ps
+   # Deve mostrar o container pr-performance rodando
+   ```
+
+### Verificação de Logs
+
+Os logs do cron e da aplicação são salvos em volumes para fácil acesso:
+
+```bash
+# Ver logs do cron
+docker exec pr-performance cat /var/log/cron/cron.log
+
+# Ver logs da aplicação (salvos na máquina host)
+cat logs/app.log
+```
+
+## Gestão do Serviço
+
+### Parar o Serviço
+```bash
+docker-compose -f docker-compose.yml down
+```
+
+### Reiniciar o Serviço
+```bash
+docker-compose -f docker-compose.yml restart
+```
+
+### Atualizar o Serviço após Mudanças
+```bash
+docker-compose -f docker-compose.yml up -d --build
+```
+
+### Executar Manualmente (sem esperar o agendamento)
+```bash
+docker exec pr-performance sh -c "cd /app && npm run send-discord-last-week"
+```
+
+## Detalhes Técnicos
+
+- O container usa Alpine Linux com Node.js 18 para minimizar o tamanho
+- O cron é configurado para rodar o comando `npm run send-discord-last-week` toda segunda-feira às 09:00
+- O timezone é configurado para America/Sao_Paulo
+- O container é configurado para reiniciar automaticamente (restart: always)
+- Os logs são persistidos em volumes para facilitar o diagnóstico
+
+## Personalizações
+
+### Modificar o Horário do Agendamento
+
+Se precisar mudar o horário, edite o arquivo `Dockerfile`:
+
+```dockerfile
+# O formato é: minuto hora dia_do_mês mês dia_da_semana
+# Ex: 0 9 * * 1 = Segunda-feira às 09:00
+RUN echo "0 9 * * 1 cd /app && npm run send-discord-last-week >> /var/log/cron/cron.log 2>&1" > /etc/crontabs/root
+```
+
+Após a alteração, reconstrua e reinicie o container:
+```bash
+docker-compose -f docker-compose.yml up -d --build
+```

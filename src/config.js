@@ -32,7 +32,7 @@ const config = {
   // Configuração do Discord
   discord: {
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
-    username: process.env.DISCORD_BOT_USERNAME || "PR Performance",
+    username: process.env.DISCORD_BOT_USERNAME || "Prformance",
     avatarUrl: process.env.DISCORD_BOT_AVATAR_URL || "",
   },
 
