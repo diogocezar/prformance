@@ -2,7 +2,8 @@ services:
   app:
     build:
       context: .
-    container_name: pr-performance
+    image: diogocezar/prformance:latest
+    container_name: prformance
     restart: always
     volumes:
       - ./cache:/app/.cache
