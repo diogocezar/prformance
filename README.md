@@ -403,7 +403,7 @@ Você pode ajustar os limites de concorrência modificando as constantes no arqu
 
 ---
 
-# Agendador Automático para PR Performance Tracker
+# Agendador Automático para PR Performance Tracker (Docker)
 
 Este projeto configura um container Docker com cron para enviar automaticamente o ranking de performance da última semana para o Discord **todas as segundas-feiras às 09:00**.
 
@@ -416,78 +416,113 @@ Este projeto configura um container Docker com cron para enviar automaticamente 
 
 ### Passos para Iniciar
 
-1. **Copie o arquivo .env.example para .env e configure suas credenciais:**
+1. **Configure o arquivo .env**
    ```bash
-   cp .env.example .env
-   # Edite o arquivo .env com seu editor preferido
+   # Copie o arquivo de exemplo
+   cp .env.sample .env
+   
+   # Edite com suas credenciais
+   nano .env
    ```
 
-2. **Inicie o serviço de agendamento:**
+2. **Crie os diretórios necessários**
    ```bash
-   docker-compose -f docker-compose.yml up -d
+   mkdir -p logs cache
    ```
 
-3. **Verifique se o serviço está rodando:**
+3. **Inicie o container**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Verifique se está rodando**
    ```bash
    docker ps
-   # Deve mostrar o container pr-performance rodando
    ```
 
-### Verificação de Logs
+## Funcionalidades
 
-Os logs do cron e da aplicação são salvos em volumes para fácil acesso:
+### Agendamento automático
+O container está configurado para enviar automaticamente o ranking toda segunda-feira às 09:00 (horário do Brasil). O agendamento é definido no arquivo `Dockerfile`.
 
+### Envio manual
+Para enviar o ranking manualmente a qualquer momento:
 ```bash
-# Ver logs do cron
-docker exec pr-performance cat /var/log/cron/cron.log
-
-# Ver logs da aplicação (salvos na máquina host)
-cat logs/app.log
+./src/scripts/sh/send-discord.sh
 ```
 
-## Gestão do Serviço
+## Logs e monitoramento
 
-### Parar o Serviço
+### Ver logs
 ```bash
-docker-compose -f docker-compose.yml down
+# Logs do container
+docker-compose logs
+
+# Acompanhar logs em tempo real
+docker-compose logs --follow
+
+# Ver logs específicos do cron
+docker exec pr-performance cat /app/logs/cron-discord.log
 ```
 
-### Reiniciar o Serviço
+## Gerenciamento
+
+### Parar o container
 ```bash
-docker-compose -f docker-compose.yml restart
+docker-compose down
 ```
 
-### Atualizar o Serviço após Mudanças
+### Reiniciar o container
 ```bash
-docker-compose -f docker-compose.yml up -d --build
+docker-compose restart
 ```
 
-### Executar Manualmente (sem esperar o agendamento)
+### Reconstruir após alterações
 ```bash
-docker exec pr-performance sh -c "cd /app && npm run send-discord-last-week"
+docker-compose up -d --build
 ```
 
-## Detalhes Técnicos
+## Personalização
 
-- O container usa Alpine Linux com Node.js 18 para minimizar o tamanho
-- O cron é configurado para rodar o comando `npm run send-discord-last-week` toda segunda-feira às 09:00
-- O timezone é configurado para America/Sao_Paulo
-- O container é configurado para reiniciar automaticamente (restart: always)
-- Os logs são persistidos em volumes para facilitar o diagnóstico
-
-## Personalizações
-
-### Modificar o Horário do Agendamento
-
-Se precisar mudar o horário, edite o arquivo `Dockerfile`:
+### Alterar o horário de envio
+Para modificar o horário ou dia do envio automático, edite a seguinte linha no arquivo `Dockerfile` e reconstrua o container:
 
 ```dockerfile
-# O formato é: minuto hora dia_do_mês mês dia_da_semana
-# Ex: 0 9 * * 1 = Segunda-feira às 09:00
-RUN echo "0 9 * * 1 cd /app && npm run send-discord-last-week >> /var/log/cron/cron.log 2>&1" > /etc/crontabs/root
+# Formato: minuto hora dia_mes mes dia_semana
+# 0 9 * * 1 = Segunda-feira às 09:00
+RUN echo "0 9 * * 1 /app/send-weekly.sh > /app/logs/cron-discord.log 2>&1" > /etc/crontabs/root
 ```
 
-Após a alteração, reconstrua e reinicie o container:
+Após modificar, reconstrua o container:
 ```bash
-docker-compose -f docker-compose.yml up -d --build
+docker-compose up -d --build
 ```
+
+## Sobre o cálculo de datas
+
+O script utiliza um método robusto para calcular a data da semana anterior, compatível com diversas versões do comando `date` (GNU, BusyBox, etc.). Isso garante o funcionamento em diferentes ambientes Docker.
+
+O script tenta vários formatos comuns do comando `date` e, se todos falharem, realiza um cálculo manual para determinar a data exata de 7 dias atrás.
+
+## Solução de Problemas
+
+- **Verificar logs de erros:**
+  ```bash
+  docker logs pr-performance
+  ```
+
+- **Entrar no container para diagnóstico:**
+  ```bash
+  docker exec -it pr-performance sh
+  ```
+
+- **Verificar as variáveis de ambiente no container:**
+  ```bash
+  docker exec pr-performance env | grep GITHUB
+  docker exec pr-performance env | grep DISCORD
+  ```
+
+- **Testar manualmente o comando dentro do container:**
+  ```bash
+  docker exec -it pr-performance sh -c "cd /app && npm run send-discord-last-week"
+  ```
