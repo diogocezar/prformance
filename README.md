@@ -17,12 +17,12 @@ Cada uma dessas ações tem um peso específico para calcular o score do desenvo
 
 ## Fórmula do Score
 
-- Commits enviados: +2 pontos cada
+- Commits enviados: +3 pontos cada
 - Pull Requests abertas: +5 pontos cada
-- Pull Requests revisadas (Code Reviews): +3 pontos cada
+- Pull Requests revisadas (Code Reviews): +4 pontos cada
 - Issues abertas: +1 ponto cada
-- Issues concluídas: +4 pontos cada
-- Comentários em PRs: +2 pontos cada
+- Issues concluídas: +6 pontos cada
+- Comentários em PRs: +3 pontos cada
 - Branches criadas: +1 ponto cada
 
 ## Requisitos
